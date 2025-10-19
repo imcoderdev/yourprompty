@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Heart, Copy, Users, Check, ExternalLink } from 'lucide-react';
+import { toast } from 'react-toastify';
 import AIModelSelector from './AIModelSelector';
 
 interface PromptCardProps {
@@ -30,16 +31,30 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
   const [isHovered, setIsHovered] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [selectedModel, setSelectedModel] = useState<string>('');
+  const [showRipple, setShowRipple] = useState(false);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(prompt.prompt);
     setIsCopied(true);
-    setCopyScale(1.2);
+    setCopyScale(1.3);
+    setShowRipple(true);
+    toast.success('Prompt copied to clipboard!', {
+      position: "top-right",
+      autoClose: 2000,
+      hideProgressBar: false,
+      closeOnClick: true,
+      pauseOnHover: true,
+      draggable: true,
+      progress: undefined,
+    });
+    
+    // Reset ripple
+    setTimeout(() => setShowRipple(false), 600);
     
     // Reset copy animation
     setTimeout(() => {
       setCopyScale(1);
-    }, 200);
+    }, 300);
     
     // Reset copied state
     setTimeout(() => setIsCopied(false), 2000);
@@ -138,17 +153,20 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
             </p>
             <button
               onClick={handleCopy}
-              className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all duration-300 ${
+              className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all duration-300 overflow-hidden ${
                 isCopied
                   ? 'bg-green-500 text-white scale-110'
                   : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 shadow-sm'
               }`}
               style={{ transform: `scale(${copyScale})` }}
             >
+              {showRipple && (
+                <div className="absolute inset-0 bg-purple-400 rounded-lg animate-ping opacity-75"></div>
+              )}
               {isCopied ? (
-                <Check className="w-3 h-3 animate-bounce" />
+                <Check className="w-3 h-3 animate-bounce relative z-10" />
               ) : (
-                <Copy className="w-3 h-3" />
+                <Copy className="w-3 h-3 relative z-10" />
               )}
             </button>
           </div>
@@ -261,7 +279,7 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
           </p>
           <button
             onClick={handleCopy}
-            className={`absolute top-3 right-3 p-2.5 rounded-xl transition-all duration-300 ${
+            className={`absolute top-3 right-3 p-2.5 rounded-xl transition-all duration-300 overflow-hidden ${
               isCopied
                 ? 'bg-green-500 text-white shadow-lg scale-110'
                 : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 shadow-md border border-gray-200'
@@ -270,10 +288,13 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
               transform: `scale(${copyScale})` 
             }}
           >
+            {showRipple && (
+              <div className="absolute inset-0 bg-purple-400 rounded-xl animate-ping opacity-75"></div>
+            )}
             {isCopied ? (
-              <Check className="w-4 h-4 animate-bounce" />
+              <Check className="w-4 h-4 animate-bounce relative z-10" />
             ) : (
-              <Copy className="w-4 h-4" />
+              <Copy className="w-4 h-4 relative z-10" />
             )}
           </button>
           {isCopied && (

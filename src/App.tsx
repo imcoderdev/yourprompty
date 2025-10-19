@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import PromptFeed from './components/PromptFeed';
@@ -74,6 +76,7 @@ function App() {
       {showAIExplorer && (
         <AIModelExplorer onClose={() => setShowAIExplorer(false)} />
       )}
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
     </div>
   );
 }
