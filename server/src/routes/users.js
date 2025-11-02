@@ -53,7 +53,7 @@ router.get('/:email/profile', async (req, res, next) => {
     const conn = await getConnection();
     try {
       const { rows: userRows } = await conn.query(
-        'SELECT email, name, user_id, profile_photo, created_at FROM users WHERE email = $1',
+        'SELECT email, name, user_id, profile_photo, tagline, instagram, twitter, linkedin, github, youtube, tiktok, website, created_at FROM users WHERE email = $1',
         [email]
       );
       if (!userRows.length) return res.status(404).json({ message: 'User not found' });
@@ -75,7 +75,19 @@ router.get('/:email/profile', async (req, res, next) => {
       );
 
       return res.json({
-        user: { email: userRows[0].email, name: userRows[0].name, userId: userRows[0].user_id, profilePhoto: userRows[0].profile_photo },
+        user: { 
+          name: userRows[0].name, 
+          userId: userRows[0].user_id, 
+          profilePhoto: userRows[0].profile_photo,
+          tagline: userRows[0].tagline,
+          instagram: userRows[0].instagram,
+          twitter: userRows[0].twitter,
+          linkedin: userRows[0].linkedin,
+          github: userRows[0].github,
+          youtube: userRows[0].youtube,
+          tiktok: userRows[0].tiktok,
+          website: userRows[0].website
+        },
         stats: {
           followers: stats.followers,
           following: stats.following,
@@ -101,6 +113,8 @@ router.get('/:email/profile', async (req, res, next) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+export default router;
 
 // Follow a user
 router.post('/:email/follow', authMiddleware, async (req, res) => {
@@ -144,8 +158,6 @@ router.delete('/:email/follow', authMiddleware, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-export default router;
 
 // Me profile (auth)
 router.get('/me/profile', authMiddleware, async (req, res) => {
