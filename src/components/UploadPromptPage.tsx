@@ -39,6 +39,7 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,10 +76,19 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
         throw new Error(msg?.message || 'Failed to create prompt');
       }
       const data = await res.json();
-      onCreated(data);
+      
+      // Show success message before closing
+      setSuccess(true);
+      setLoading(false);
+      setError(null);
+      
+      // Wait a moment to show success before redirecting
+      setTimeout(() => {
+        onCreated(data);
+      }, 1500);
+      
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
-    } finally {
       setLoading(false);
     }
   };
@@ -238,6 +248,19 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
             {error && (
               <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 animate-shake">
                 <p className="text-sm text-red-600 font-medium">{error}</p>
+              </div>
+            )}
+
+            {/* Success Message */}
+            {success && (
+              <div className="bg-green-50 border-2 border-green-200 rounded-xl p-4 animate-fade-in-up">
+                <div className="flex items-center space-x-3">
+                  <Check className="w-6 h-6 text-green-600" />
+                  <div>
+                    <p className="text-sm text-green-800 font-semibold">Prompt Published Successfully! 🎉</p>
+                    <p className="text-xs text-green-600 mt-1">Redirecting to home page...</p>
+                  </div>
+                </div>
               </div>
             )}
 

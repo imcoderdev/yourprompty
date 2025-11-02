@@ -122,10 +122,18 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, onLogin, startIn
         if (data?.token) {
           localStorage.setItem('token', data.token);
         }
-        if (data?.user) {
-          onLogin(data.user);
-        }
-        onClose();
+        
+        // Show a brief success state before redirecting
+        setIsLoading(false);
+        setError(null);
+        
+        // Wait to show success, then close and trigger login
+        setTimeout(() => {
+          if (data?.user) {
+            onLogin(data.user);
+          }
+          onClose();
+        }, 800);
       }
     } catch (err: any) {
       setError(err?.message || 'Something went wrong');
