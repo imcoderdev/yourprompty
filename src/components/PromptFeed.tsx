@@ -4,9 +4,12 @@ import CategoryFilter from './CategoryFilter';
 
 interface PromptFeedProps {
   onViewCreator: (creator: any) => void;
+  items?: Array<any>;
+  highlightPromptId?: number | null;
+  onPromptVisible?: () => void;
 }
 
-const PromptFeed: React.FC<PromptFeedProps> = ({ onViewCreator }) => {
+const PromptFeed: React.FC<PromptFeedProps> = ({ onViewCreator, items, highlightPromptId, onPromptVisible }) => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [isMobile, setIsMobile] = useState(false);
 
@@ -20,7 +23,18 @@ const PromptFeed: React.FC<PromptFeedProps> = ({ onViewCreator }) => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  const prompts = [
+  // Clear highlight after 3 seconds
+  React.useEffect(() => {
+    if (highlightPromptId && onPromptVisible) {
+      const timer = setTimeout(() => {
+        onPromptVisible();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [highlightPromptId, onPromptVisible]);
+
+  // Default prompts for fallback
+  const defaultPrompts = [
     {
       id: 1,
       title: "Golden Hour Mountain Vista",
@@ -158,6 +172,32 @@ const PromptFeed: React.FC<PromptFeedProps> = ({ onViewCreator }) => {
     }
   ];
 
+  // Use actual items or default prompts
+  const prompts = items && items.length > 0 ? items : defaultPrompts;
+
+  const filtered = React.useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'all') return prompts;
+    const norm = (s: string) => s.toLowerCase().trim().replace(/\s+/g, '-');
+    const sel = norm(selectedCategory);
+    return prompts.filter(p => norm(String(p.category || '')) === sel);
+  }, [prompts, selectedCategory]);
+
+  // Show loading state if items is null (still fetching)
+  if (items === null) {
+    return (
+      <section className="py-20 px-4 bg-gradient-to-b from-white to-gray-50">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-center items-center min-h-[400px]">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-4 border-purple-600 mx-auto mb-4"></div>
+              <p className="text-gray-600 text-lg">Loading amazing prompts...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
   return (
     <section className="py-20 px-4 bg-gradient-to-b from-white to-gray-50">
       <div className="max-w-7xl mx-auto">
@@ -181,14 +221,19 @@ const PromptFeed: React.FC<PromptFeedProps> = ({ onViewCreator }) => {
             ? 'grid grid-cols-2 gap-2 px-2' 
             : 'columns-1 md:columns-2 lg:columns-3 xl:columns-4 gap-6 space-y-6'
         }`}>
-          {prompts.map((prompt, index) => (
-            <PromptCard
+          {filtered.map((prompt, index) => (
+            <div 
               key={prompt.id}
-              prompt={prompt}
-              onViewCreator={onViewCreator}
-              index={index}
-              isMobile={isMobile}
-            />
+              id={`prompt-${prompt.id}`}
+              className={`${highlightPromptId === prompt.id ? 'ring-4 ring-purple-500 ring-opacity-50 rounded-2xl animate-pulse' : ''}`}
+            >
+              <PromptCard
+                prompt={prompt}
+                onViewCreator={onViewCreator}
+                index={index}
+                isMobile={isMobile}
+              />
+            </div>
           ))}
         </div>
       </div>

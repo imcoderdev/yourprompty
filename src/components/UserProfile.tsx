@@ -1,79 +1,141 @@
-import React, { useState } from 'react';
-import { ArrowLeft, User, Mail, MapPin, Calendar, Link, Settings, Upload, Heart, Copy, CreditCard as Edit3, Camera, Sparkles, Crown, Star } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, User, Mail, Settings, Heart, Copy, CreditCard as Edit3, Camera, Sparkles, Crown, Plus } from 'lucide-react';
 
 interface UserProfileProps {
   user: any;
   onBack: () => void;
+  onShowUpload?: () => void;
 }
 
-const UserProfile: React.FC<UserProfileProps> = ({ user, onBack }) => {
+const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload }) => {
+  const baseUrl = 'http://localhost:4000';
   const [isEditing, setIsEditing] = useState(false);
-  const [profileData, setProfileData] = useState({
-    name: user?.name || 'John Doe',
-    email: user?.email || 'john@example.com',
-    bio: user?.bio || 'AI enthusiast and creative prompt designer. Love exploring the boundaries of artificial intelligence.',
-    location: user?.location || 'San Francisco, CA',
-    website: user?.website || 'johndoe.com',
-    avatar: user?.avatar || 'https://images.pexels.com/photos/220453/pexels-photo-220453.jpeg?auto=compress&cs=tinysrgb&w=200'
+  const [profileData, setProfileData] = useState<any>({
+    name: user?.name || '',
+    email: user?.email || '',
+    userId: user?.userId || '',
+    avatar: user?.avatar || ''
   });
+  const [stats, setStats] = useState({ prompts: 0, followers: 0, following: 0, totalLikes: 0 });
+  const [prompts, setPrompts] = useState<Array<any>>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [newPhoto, setNewPhoto] = useState<File | null>(null);
 
-  const [userStats] = useState({
-    prompts: 24,
-    followers: 1250,
-    following: 340,
-    totalLikes: 5600,
-    totalUses: 12400,
-    joinDate: 'March 2024'
-  });
-
-  const [userPrompts] = useState([
-    {
-      id: 1,
-      title: "Cyberpunk Neon City",
-      prompt: "Futuristic cyberpunk cityscape at night with neon lights, flying cars, and holographic advertisements",
-      result: "https://images.pexels.com/photos/2159065/pexels-photo-2159065.jpeg?auto=compress&cs=tinysrgb&w=400",
-      likes: 892,
-      uses: 2100,
-      category: "Digital Art"
-    },
-    {
-      id: 2,
-      title: "Mystical Forest",
-      prompt: "Enchanted forest with glowing mushrooms, fairy lights, and magical creatures in ethereal lighting",
-      result: "https://images.pexels.com/photos/1438248/pexels-photo-1438248.jpeg?auto=compress&cs=tinysrgb&w=400",
-      likes: 654,
-      uses: 1800,
-      category: "Fantasy"
-    },
-    {
-      id: 3,
-      title: "Modern Architecture",
-      prompt: "Minimalist concrete building with large glass windows and geometric shapes in natural lighting",
-      result: "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=400",
-      likes: 1203,
-      uses: 3200,
-      category: "Architecture"
-    }
-  ]);
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setError(null);
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const res = await fetch(`${baseUrl}/api/users/me/profile`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) {
+          const msg = await res.json().catch(() => ({}));
+          throw new Error(msg?.message || 'Failed to load profile');
+        }
+        const data = await res.json();
+        const avatar = data?.user?.profilePhoto
+          ? (String(data.user.profilePhoto).startsWith('/') ? `${baseUrl}${data.user.profilePhoto}` : data.user.profilePhoto)
+          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data?.user?.name || 'U')}`;
+        setProfileData({
+          name: data.user.name,
+          email: data.user.email,
+          userId: data.user.userId,
+          avatar
+        });
+        setStats({
+          prompts: data.stats.promptsCount,
+          followers: data.stats.followers,
+          following: data.stats.following,
+          totalLikes: data.stats.totalLikes
+        });
+        const mapped = (data.prompts || []).map((p: any) => {
+          const img = p.imageUrl
+            ? (String(p.imageUrl).startsWith('http') ? p.imageUrl : `${baseUrl}${p.imageUrl}`)
+            : `https://picsum.photos/seed/${p.id}/600/400`;
+          return {
+            id: p.id,
+            title: p.title,
+            prompt: p.content,
+            result: img,
+            likes: p.likeCount,
+            uses: p.commentCount,
+            category: p.category
+          };
+        });
+        setPrompts(mapped);
+      } catch (e: any) {
+        setError(e?.message || 'Something went wrong');
+      }
+    };
+    load();
+  }, []);
 
   const handleInputChange = (field: string, value: string) => {
     setProfileData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSave = () => {
-    setIsEditing(false);
-    // Here you would typically save to backend
-    console.log('Saving profile:', profileData);
+    setError(null);
+    setSaving(true);
+    const run = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) throw new Error('Not authenticated');
+        const form = new FormData();
+        if (profileData.userId) form.append('userId', profileData.userId);
+        if (newPhoto) form.append('profilePhoto', newPhoto);
+        const res = await fetch(`${baseUrl}/api/users/me`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}` },
+          body: form
+        });
+        if (!res.ok) {
+          const msg = await res.json().catch(() => ({}));
+          throw new Error(msg?.message || 'Failed to update profile');
+        }
+        const u = await res.json();
+        const avatar = u?.profilePhoto
+          ? (String(u.profilePhoto).startsWith('/') ? `${baseUrl}${u.profilePhoto}` : u.profilePhoto)
+          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u?.name || 'U')}`;
+        setProfileData((prev: any) => ({ ...prev, userId: u.userId, avatar }));
+        setIsEditing(false);
+        setNewPhoto(null);
+      } catch (e: any) {
+        setError(e?.message || 'Something went wrong');
+      } finally {
+        setSaving(false);
+      }
+    };
+    run();
   };
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      setNewPhoto(file);
       const reader = new FileReader();
-      reader.onload = (e) => {
-        setProfileData(prev => ({ ...prev, avatar: e.target?.result as string }));
-      };
+      reader.onload = (e) => setProfileData((prev: any) => ({ ...prev, avatar: e.target?.result as string }));
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDeletePrompt = async (id: number) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
+      const res = await fetch(`${baseUrl}/api/prompts/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const msg = await res.json().catch(() => ({}));
+        throw new Error(msg?.message || 'Failed to delete');
+      }
+      setPrompts(prev => prev.filter(p => p.id !== id));
+      setStats(prev => ({ ...prev, prompts: Math.max(0, (prev.prompts || 1) - 1) }));
+    } catch (e: any) {
+      setError(e?.message || 'Something went wrong');
     }
   };
 
@@ -160,71 +222,43 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack }) => {
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Username</label>
+                      <input
+                        type="text"
+                        value={profileData.userId}
+                        onChange={(e) => handleInputChange('userId', e.target.value)}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300"
+                      />
+                    </div>
+                    <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
                       <input
                         type="email"
                         value={profileData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Bio</label>
-                      <textarea
-                        value={profileData.bio}
-                        onChange={(e) => handleInputChange('bio', e.target.value)}
-                        rows={4}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300 resize-none"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
-                      <input
-                        type="text"
-                        value={profileData.location}
-                        onChange={(e) => handleInputChange('location', e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Website</label>
-                      <input
-                        type="url"
-                        value={profileData.website}
-                        onChange={(e) => handleInputChange('website', e.target.value)}
-                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300"
+                        disabled
                       />
                     </div>
                     <button
                       onClick={handleSave}
-                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300"
+                      disabled={saving}
+                      className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold hover:shadow-lg hover:scale-105 transition-all duration-300 disabled:opacity-50"
                     >
-                      Save Changes
+                      {saving ? 'Saving…' : 'Save Changes'}
                     </button>
                   </>
                 ) : (
                   <>
                     <div>
                       <h2 className="text-3xl font-bold text-gray-900 mb-2">{profileData.name}</h2>
-                      <p className="text-gray-600 text-lg leading-relaxed">{profileData.bio}</p>
+                      <p className="text-gray-600 text-lg leading-relaxed">@{profileData.userId}</p>
                     </div>
                     
                     <div className="space-y-3">
                       <div className="flex items-center space-x-3 text-gray-600">
                         <Mail className="w-5 h-5" />
                         <span>{profileData.email}</span>
-                      </div>
-                      <div className="flex items-center space-x-3 text-gray-600">
-                        <MapPin className="w-5 h-5" />
-                        <span>{profileData.location}</span>
-                      </div>
-                      <div className="flex items-center space-x-3 text-gray-600">
-                        <Calendar className="w-5 h-5" />
-                        <span>Joined {userStats.joinDate}</span>
-                      </div>
-                      <div className="flex items-center space-x-3 text-gray-600">
-                        <Link className="w-5 h-5" />
-                        <span className="text-purple-600 hover:underline cursor-pointer">{profileData.website}</span>
                       </div>
                     </div>
                   </>
@@ -239,25 +273,21 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack }) => {
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="text-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="text-2xl font-bold text-purple-600">{userStats.prompts}</div>
+                    <div className="text-2xl font-bold text-purple-600">{stats.prompts}</div>
                     <div className="text-sm text-gray-500">Prompts</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="text-2xl font-bold text-pink-600">{userStats.followers.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-pink-600">{stats.followers.toLocaleString()}</div>
                     <div className="text-sm text-gray-500">Followers</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="text-2xl font-bold text-blue-600">{userStats.following}</div>
+                    <div className="text-2xl font-bold text-blue-600">{stats.following}</div>
                     <div className="text-sm text-gray-500">Following</div>
                   </div>
                   <div className="text-center p-4 bg-white rounded-xl shadow-sm">
-                    <div className="text-2xl font-bold text-green-600">{userStats.totalLikes.toLocaleString()}</div>
+                    <div className="text-2xl font-bold text-green-600">{stats.totalLikes.toLocaleString()}</div>
                     <div className="text-sm text-gray-500">Total Likes</div>
                   </div>
-                </div>
-                <div className="mt-4 text-center p-4 bg-gradient-to-r from-purple-100 to-pink-100 rounded-xl">
-                  <div className="text-2xl font-bold text-purple-700">{userStats.totalUses.toLocaleString()}</div>
-                  <div className="text-sm text-purple-600 font-medium">Total Uses</div>
                 </div>
               </div>
             </div>
@@ -266,12 +296,38 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack }) => {
 
         {/* User's Prompts */}
         <div className="animate-fade-in-up" style={{animationDelay: '0.4s'}}>
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center space-x-2">
-            <Sparkles className="w-6 h-6 text-purple-600" />
-            <span>My Prompts</span>
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {userPrompts.map((prompt) => (
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 flex items-center space-x-2">
+              <Sparkles className="w-6 h-6 text-purple-600" />
+              <span>My Prompts</span>
+              <span className="text-lg font-normal text-gray-500">({prompts.length})</span>
+            </h2>
+            {onShowUpload && (
+              <button
+                onClick={onShowUpload}
+                className="group bg-gradient-to-r from-purple-600 via-pink-600 to-purple-700 text-white px-6 py-3 rounded-xl font-semibold hover:shadow-2xl hover:scale-105 transition-all duration-300 flex items-center space-x-2"
+              >
+                <Plus className="w-5 h-5 group-hover:rotate-90 transition-transform duration-300" />
+                <span>Upload Prompt</span>
+              </button>
+            )}
+          </div>
+          
+          {prompts.length === 0 ? (
+            /* Empty State */
+            <div className="bg-white rounded-2xl shadow-lg p-12 text-center">
+              <div className="w-24 h-24 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Sparkles className="w-12 h-12 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">No Prompts Yet</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Start your creative journey by uploading your first AI prompt! Share your ideas and inspire the community.
+              </p>
+            </div>
+          ) : (
+            /* Prompts Grid */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {prompts.map((prompt) => (
               <div
                 key={prompt.id}
                 className="bg-white rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer hover:scale-105"
@@ -306,11 +362,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack }) => {
                         <span>{prompt.uses}</span>
                       </div>
                     </div>
+                    <button onClick={() => handleDeletePrompt(prompt.id)} className="px-3 py-1 rounded-lg border hover:bg-red-50 text-red-600">
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
+          {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
         </div>
       </div>
     </div>
