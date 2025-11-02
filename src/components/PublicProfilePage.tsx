@@ -355,7 +355,7 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
               <p className="text-gray-600">This creator hasn't shared any prompts yet. Check back later!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {profile.prompts.map((p) => {
                 const img = p.imageUrl
                   ? (String(p.imageUrl).startsWith('http') ? p.imageUrl : `${baseUrl}${p.imageUrl}`)
@@ -364,56 +364,62 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
                 return (
                   <div 
                     key={p.id} 
-                    className="group bg-white/90 backdrop-blur-sm rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all border border-purple-100 hover:scale-105 hover:-rotate-1"
+                    className="group bg-white/90 backdrop-blur-sm rounded-2xl md:rounded-3xl shadow-lg overflow-hidden hover:shadow-2xl transition-all border border-purple-100 hover:scale-105 hover:-rotate-1"
                   >
                     {img ? (
                       <div className="relative overflow-hidden">
                         <img 
                           src={img} 
                           alt={p.title} 
-                          className="w-full h-56 object-cover group-hover:scale-110 transition-transform duration-500" 
+                          className="w-full h-48 md:h-56 object-cover group-hover:scale-110 transition-transform duration-500" 
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                       </div>
                     ) : (
-                      <div className="w-full h-56 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 flex items-center justify-center">
-                        <span className="text-6xl">💡</span>
+                      <div className="w-full h-48 md:h-56 bg-gradient-to-br from-purple-100 via-pink-100 to-blue-100 flex items-center justify-center">
+                        <span className="text-5xl md:text-6xl">💡</span>
                       </div>
                     )}
-                    <div className="p-6">
-                      <div className="inline-block px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-xs font-bold rounded-full mb-3 shadow-sm">
+                    <div className="p-4 md:p-6">
+                      <div className="inline-block px-2.5 md:px-3 py-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] md:text-xs font-bold rounded-full mb-2 md:mb-3 shadow-sm">
                         {p.category}
                       </div>
-                      <h4 className="font-bold text-xl mb-3 line-clamp-2 group-hover:text-purple-600 transition-colors">
+                      <h4 className="font-bold text-base md:text-xl mb-2 md:mb-3 line-clamp-2 group-hover:text-purple-600 transition-colors">
                         {p.title}
                       </h4>
-                      <p className="text-gray-600 text-sm line-clamp-3 mb-4 leading-relaxed">
+                      <p className="text-gray-600 text-xs md:text-sm line-clamp-3 mb-3 md:mb-4 leading-relaxed">
                         {p.content}
                       </p>
                       <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 text-red-500 font-medium">
+                        <div className="flex items-center gap-3 text-sm">
+                          <div className="flex items-center gap-1.5 text-red-500 font-medium">
                             <Heart className="w-4 h-4 fill-current" />
                             <span>{p.likeCount}</span>
                           </div>
-                          <div className="flex items-center gap-2 text-gray-500 font-medium">
-                            <span className="text-xs">💬</span>
+                          <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                            <span className="text-sm">💬</span>
                             <span>{p.commentCount}</span>
                           </div>
                         </div>
                         <button
                           onClick={() => handleCopyPrompt(p.id, p.content)}
-                          className={`p-2 rounded-xl transition-all hover:scale-110 ${
+                          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all hover:scale-105 shadow-md ${
                             isCopied 
-                              ? 'bg-green-500 text-white shadow-lg' 
+                              ? 'bg-green-500 text-white' 
                               : 'bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:shadow-lg'
                           }`}
                           title="Copy prompt"
                         >
                           {isCopied ? (
-                            <Check className="w-5 h-5" />
+                            <>
+                              <Check className="w-4 h-4" />
+                              <span className="text-xs">Copied!</span>
+                            </>
                           ) : (
-                            <Copy className="w-5 h-5" />
+                            <>
+                              <Copy className="w-4 h-4" />
+                              <span className="text-xs hidden sm:inline">Copy</span>
+                            </>
                           )}
                         </button>
                       </div>
