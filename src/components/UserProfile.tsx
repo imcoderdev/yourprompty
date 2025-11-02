@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Mail, Settings, Heart, Copy, CreditCard as Edit3, Camera, Sparkles, Crown, Plus } from 'lucide-react';
+import { ArrowLeft, User, Mail, Settings, Heart, Copy, CreditCard as Edit3, Camera, Sparkles, Crown, Plus, Instagram, Twitter, Linkedin, Github, Youtube, Globe, Music } from 'lucide-react';
 
 interface UserProfileProps {
   user: any;
@@ -14,7 +14,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
     name: user?.name || '',
     email: user?.email || '',
     userId: user?.userId || '',
-    avatar: user?.avatar || ''
+    avatar: user?.avatar || '',
+    tagline: user?.tagline || '',
+    instagram: user?.instagram || '',
+    twitter: user?.twitter || '',
+    linkedin: user?.linkedin || '',
+    github: user?.github || '',
+    youtube: user?.youtube || '',
+    tiktok: user?.tiktok || '',
+    website: user?.website || ''
   });
   const [stats, setStats] = useState({ prompts: 0, followers: 0, following: 0, totalLikes: 0 });
   const [prompts, setPrompts] = useState<Array<any>>([]);
@@ -41,7 +49,15 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
           name: data.user.name,
           email: data.user.email,
           userId: data.user.userId,
-          avatar
+          avatar,
+          tagline: data.user.tagline || '',
+          instagram: data.user.instagram || '',
+          twitter: data.user.twitter || '',
+          linkedin: data.user.linkedin || '',
+          github: data.user.github || '',
+          youtube: data.user.youtube || '',
+          tiktok: data.user.tiktok || '',
+          website: data.user.website || ''
         });
         setStats({
           prompts: data.stats.promptsCount,
@@ -84,6 +100,14 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
         if (!token) throw new Error('Not authenticated');
         const form = new FormData();
         if (profileData.userId) form.append('userId', profileData.userId);
+        if (profileData.tagline) form.append('tagline', profileData.tagline);
+        if (profileData.instagram) form.append('instagram', profileData.instagram);
+        if (profileData.twitter) form.append('twitter', profileData.twitter);
+        if (profileData.linkedin) form.append('linkedin', profileData.linkedin);
+        if (profileData.github) form.append('github', profileData.github);
+        if (profileData.youtube) form.append('youtube', profileData.youtube);
+        if (profileData.tiktok) form.append('tiktok', profileData.tiktok);
+        if (profileData.website) form.append('website', profileData.website);
         if (newPhoto) form.append('profilePhoto', newPhoto);
         const res = await fetch(`${baseUrl}/api/users/me`, {
           method: 'PATCH',
@@ -231,6 +255,18 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
                       />
                     </div>
                     <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Tagline 🎯</label>
+                      <input
+                        type="text"
+                        value={profileData.tagline}
+                        onChange={(e) => handleInputChange('tagline', e.target.value)}
+                        placeholder="AI Artist | Creative Director | Prompt Engineer"
+                        maxLength={200}
+                        className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-300"
+                      />
+                      <p className="text-xs text-gray-500 mt-1">{profileData.tagline?.length || 0}/200</p>
+                    </div>
+                    <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2">Email</label>
                       <input
                         type="email"
@@ -240,6 +276,87 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
                         disabled
                       />
                     </div>
+                    
+                    {/* Social Media Section */}
+                    <div className="pt-4 border-t-2 border-gray-100">
+                      <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center space-x-2">
+                        <Globe className="w-5 h-5 text-purple-600" />
+                        <span>Social Media Links</span>
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="flex items-center space-x-2">
+                          <Instagram className="w-5 h-5 text-pink-600 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.instagram}
+                            onChange={(e) => handleInputChange('instagram', e.target.value)}
+                            placeholder="instagram.com/yourhandle"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-pink-500 focus:ring-2 focus:ring-pink-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Twitter className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.twitter}
+                            onChange={(e) => handleInputChange('twitter', e.target.value)}
+                            placeholder="twitter.com/yourhandle"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Linkedin className="w-5 h-5 text-blue-700 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.linkedin}
+                            onChange={(e) => handleInputChange('linkedin', e.target.value)}
+                            placeholder="linkedin.com/in/yourprofile"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-blue-700 focus:ring-2 focus:ring-blue-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Github className="w-5 h-5 text-gray-800 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.github}
+                            onChange={(e) => handleInputChange('github', e.target.value)}
+                            placeholder="github.com/yourhandle"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-gray-600 focus:ring-2 focus:ring-gray-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Youtube className="w-5 h-5 text-red-600 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.youtube}
+                            onChange={(e) => handleInputChange('youtube', e.target.value)}
+                            placeholder="youtube.com/@yourchannel"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-red-500 focus:ring-2 focus:ring-red-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Music className="w-5 h-5 text-gray-900 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.tiktok}
+                            onChange={(e) => handleInputChange('tiktok', e.target.value)}
+                            placeholder="tiktok.com/@yourhandle"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-gray-800 focus:ring-2 focus:ring-gray-100 transition-all text-sm"
+                          />
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Globe className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                          <input
+                            type="text"
+                            value={profileData.website}
+                            onChange={(e) => handleInputChange('website', e.target.value)}
+                            placeholder="yourwebsite.com"
+                            className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:border-purple-500 focus:ring-2 focus:ring-purple-100 transition-all text-sm"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    
                     <button
                       onClick={handleSave}
                       disabled={saving}
@@ -252,7 +369,12 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
                   <>
                     <div>
                       <h2 className="text-3xl font-bold text-gray-900 mb-2">{profileData.name}</h2>
-                      <p className="text-gray-600 text-lg leading-relaxed">@{profileData.userId}</p>
+                      <p className="text-gray-600 text-lg leading-relaxed mb-1">@{profileData.userId}</p>
+                      {profileData.tagline && (
+                        <p className="text-purple-600 font-medium text-base mb-3">
+                          ✨ {profileData.tagline}
+                        </p>
+                      )}
                     </div>
                     
                     <div className="space-y-3">
@@ -260,6 +382,50 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
                         <Mail className="w-5 h-5" />
                         <span>{profileData.email}</span>
                       </div>
+                      
+                      {/* Social Media Display */}
+                      {(profileData.instagram || profileData.twitter || profileData.linkedin || profileData.github || profileData.youtube || profileData.tiktok || profileData.website) && (
+                        <div className="pt-4 border-t border-gray-200">
+                          <h4 className="text-sm font-semibold text-gray-700 mb-3">Connect with me:</h4>
+                          <div className="flex flex-wrap gap-3">
+                            {profileData.instagram && (
+                              <a href={profileData.instagram.startsWith('http') ? profileData.instagram : `https://${profileData.instagram}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Instagram className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.twitter && (
+                              <a href={profileData.twitter.startsWith('http') ? profileData.twitter : `https://${profileData.twitter}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-500 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Twitter className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.linkedin && (
+                              <a href={profileData.linkedin.startsWith('http') ? profileData.linkedin : `https://${profileData.linkedin}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-blue-700 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Linkedin className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.github && (
+                              <a href={profileData.github.startsWith('http') ? profileData.github : `https://${profileData.github}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-800 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Github className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.youtube && (
+                              <a href={profileData.youtube.startsWith('http') ? profileData.youtube : `https://${profileData.youtube}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-red-600 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Youtube className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.tiktok && (
+                              <a href={profileData.tiktok.startsWith('http') ? profileData.tiktok : `https://${profileData.tiktok}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-gray-900 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Music className="w-5 h-5" />
+                              </a>
+                            )}
+                            {profileData.website && (
+                              <a href={profileData.website.startsWith('http') ? profileData.website : `https://${profileData.website}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-purple-600 text-white rounded-lg hover:scale-110 transition-transform shadow-md">
+                                <Globe className="w-5 h-5" />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
