@@ -38,6 +38,12 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
   const [selectedModel, setSelectedModel] = useState<string>('');
   const [showRipple, setShowRipple] = useState(false);
 
+  // Update like state when prompt prop changes (fixes navigation issue)
+  React.useEffect(() => {
+    setIsLiked(!!prompt.liked);
+    setLikesCount(prompt.likes || 0);
+  }, [prompt.liked, prompt.likes]);
+
   const handleCopy = async () => {
     await navigator.clipboard.writeText(prompt.prompt);
     setIsCopied(true);
@@ -72,7 +78,13 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
     }, 3000);
   };
 
-  const handleLike = async () => {
+  const handleLike = async (e?: React.MouseEvent | React.TouchEvent) => {
+    // Prevent event bubbling and default behavior
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
     if (isLiking) return;
     const token = localStorage.getItem('token');
     // Optimistic update
@@ -111,12 +123,12 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
   if (isMobile) {
     return (
       <div
-        className="bg-white rounded-2xl shadow-md hover:shadow-lg transition-all duration-500 overflow-hidden group cursor-pointer transform hover:scale-[1.02] mb-2 animate-fade-in-up"
+        className="bg-white rounded-xl shadow-md hover:shadow-lg transition-all duration-500 overflow-hidden group cursor-pointer transform hover:scale-[1.02] mb-2 animate-fade-in-up"
         style={{animationDelay: `${index * 0.05}s`}}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="relative overflow-hidden rounded-t-2xl">
+        <div className="relative overflow-hidden rounded-t-xl">
           <img
             src={prompt.result}
             alt={prompt.title}
@@ -136,7 +148,7 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
           
           {/* Category badge on image */}
           <div className="absolute top-2 left-2">
-            <span className="bg-white/80 backdrop-blur-xl text-gray-800 text-xs font-medium px-2 py-1 rounded-full shadow-md border border-white/30 ring-1 ring-black/5">
+            <span className="bg-white/80 backdrop-blur-xl text-gray-800 text-[10px] font-medium px-2 py-0.5 rounded-full shadow-md border border-white/30 ring-1 ring-black/5">
               {prompt.category}
             </span>
           </div>
@@ -171,26 +183,28 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
         </div>
         
         {/* Content below image */}
-        <div className="p-3">
+        <div className="p-2">
           {/* Creator info */}
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center space-x-2">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center space-x-1.5">
               <img
                 src={prompt.creator.avatar}
                 alt={prompt.creator.name}
-                className="w-6 h-6 rounded-full object-cover"
+                className="w-5 h-5 rounded-full object-cover"
                 onClick={() => onViewCreator(prompt.creator)}
               />
-              <span className="text-gray-700 text-sm font-medium">{prompt.creator.username}</span>
+              <span className="text-gray-700 text-xs font-medium truncate max-w-[120px]">@{prompt.creator.username}</span>
               {prompt.creator.verified && (
-                <span className="text-blue-500 text-sm">✓</span>
+                <span className="text-blue-500 text-xs">✓</span>
               )}
             </div>
             
             <div className="flex items-center space-x-2">
               <button
-                onClick={handleLike}
-                className={`p-1.5 rounded-full transition-all duration-300 ${
+                onClick={(e) => handleLike(e)}
+                onTouchEnd={(e) => handleLike(e)}
+                disabled={isLiking}
+                className={`p-1.5 rounded-full transition-all duration-300 touch-manipulation ${
                   isLiked 
                     ? 'bg-red-500 text-white' 
                     : 'bg-gray-100 text-gray-600 hover:bg-red-50 hover:text-red-500'
@@ -202,19 +216,19 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
           </div>
           
           {/* Title */}
-          <h3 className="text-sm font-semibold text-gray-900 mb-2 line-clamp-2">{prompt.title}</h3>
+          <h3 className="text-xs font-semibold text-gray-900 mb-1.5 line-clamp-2">{prompt.title}</h3>
 
           {/* Prompt text with copy button */}
-          <div className="relative bg-gray-50 rounded-lg p-3 mb-3">
+          <div className="relative bg-gray-50 rounded-lg p-2 mb-2">
             {showRipple && (
               <div className="absolute inset-0 rounded-lg bg-purple-400/30 animate-ping pointer-events-none"></div>
             )}
-            <p className="text-xs text-gray-700 line-clamp-3 pr-8 break-words">
+            <p className="text-[10px] text-gray-700 line-clamp-2 pr-7 break-words">
               <span className="font-medium text-purple-600">Prompt:</span> {prompt.prompt}
             </p>
             <button
               onClick={handleCopy}
-              className={`absolute top-2 right-2 p-1.5 rounded-lg transition-all duration-300 overflow-hidden ${
+              className={`absolute top-1.5 right-1.5 p-1 rounded-lg transition-all duration-300 overflow-hidden ${
                 isCopied
                   ? 'bg-green-500 text-white scale-110'
                   : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 shadow-sm'
@@ -233,7 +247,7 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
           </div>
           
           {/* AI Model Selector */}
-          <div className="mb-3">
+          <div className="mb-2">
             <AIModelSelector 
               onModelSelect={handleModelSelect}
               selectedModel={selectedModel}
@@ -243,13 +257,13 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
           </div>
           
           {/* Stats */}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-1">
+          <div className="flex items-center justify-between text-[10px] text-gray-500">
+            <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-0.5">
                 <Heart className={`w-3 h-3 ${isLiked ? 'text-red-500' : ''}`} />
                 <span>{likesCount.toLocaleString()}</span>
               </div>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-0.5">
                 <Copy className="w-3 h-3" />
                 <span>{prompt.uses.toLocaleString()}</span>
               </div>
@@ -319,8 +333,10 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
 
         <div className={`absolute top-4 right-4 transform transition-all duration-500 ${isHovered ? 'scale-100 opacity-100 translate-y-0' : 'scale-75 opacity-0 translate-y-2'}`}>
           <button
-            onClick={handleLike}
-            className={`p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 ${
+            onClick={(e) => handleLike(e)}
+            onTouchEnd={(e) => handleLike(e)}
+            disabled={isLiking}
+            className={`p-3 rounded-full backdrop-blur-md transition-all duration-300 hover:scale-110 touch-manipulation ${
               isLiked 
                 ? 'bg-red-500 text-white shadow-lg' 
                 : 'bg-white/95 text-gray-600 hover:bg-white hover:text-red-500 shadow-lg'
@@ -409,7 +425,12 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
         {/* Instagram-style like bar */}
         <div className="flex items-center justify-between text-sm text-gray-600 font-medium">
           <div className="flex items-center space-x-4">
-            <button onClick={handleLike} className={`flex items-center space-x-2 hover:text-red-500 transition-colors cursor-pointer ${isLiked ? 'text-red-500' : ''}`}>
+            <button 
+              onClick={(e) => handleLike(e)} 
+              onTouchEnd={(e) => handleLike(e)}
+              disabled={isLiking}
+              className={`flex items-center space-x-2 hover:text-red-500 transition-colors cursor-pointer touch-manipulation ${isLiked ? 'text-red-500' : ''}`}
+            >
               <Heart className={`w-4 h-4 hover:scale-110 transition-transform ${isLiked ? 'fill-current' : ''}`} />
               <span>{likesCount.toLocaleString()}</span>
             </button>
