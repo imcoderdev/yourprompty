@@ -1,28 +1,30 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MessageCircle, X, Send, Sparkles, Heart, Star } from 'lucide-react';
+import { MessageCircle, X, Send, Sparkles, Heart, Star, Loader } from 'lucide-react';
 
-const Chatbot = () => {
+interface Message {
+  id: number;
+  text: string;
+  sender: 'user' | 'bot';
+  timestamp: number;
+}
+
+interface ChatbotProps {
+  user?: any;
+  onTriggerAction?: (action: string, data?: any) => void;
+}
+
+const Chatbot: React.FC<ChatbotProps> = ({ user, onTriggerAction }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
+  const [messages, setMessages] = useState<Array<{id: number, text: string, sender: 'user' | 'bot', timestamp: number}>>([
     { id: 1, text: "Hey there! 👋 I'm Prompty, your creative assistant!", sender: 'bot', timestamp: Date.now() }
   ]);
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [botMood, setBotMood] = useState('happy');
+  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const botResponses = [
-    "That's awesome! 🎨 What kind of prompts are you looking for?",
-    "I love helping creators! ✨ Need some inspiration?",
-    "Ooh, interesting! 🤔 Tell me more about your project!",
-    "You're so creative! 🌟 I'm here to help you shine!",
-    "That sounds amazing! 🚀 Let's make something beautiful together!",
-    "I'm excited to help! 💫 What's your vision?",
-    "Cool beans! 🎯 Ready to create something epic?",
-    "You've got great taste! 👌 I can help you find the perfect prompt!",
-    "Woohoo! 🎉 Let's dive into the world of AI creativity!",
-    "I'm all ears! 👂 Share your creative dreams with me!"
-  ];
+  const baseUrl = 'http://localhost:4000';
 
   const randomGreetings = [
     "Hiya! 👋",
@@ -63,33 +65,87 @@ const Chatbot = () => {
     }
   }, [isOpen]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!inputValue.trim()) return;
 
     const userMessage = {
       id: Date.now(),
       text: inputValue,
-      sender: 'user',
+      sender: 'user' as const,
       timestamp: Date.now()
     };
 
     setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsTyping(true);
+    setRateLimitError(null);
 
-    // Simulate bot typing and response
-    setTimeout(() => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json'
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
+      const response = await fetch(`${baseUrl}/api/chat/message`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          message: inputValue,
+          context: 'Browsing home feed',
+          conversationId: conversationId
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to get response');
+      }
+
       setIsTyping(false);
-      const randomResponse = botResponses[Math.floor(Math.random() * botResponses.length)];
+
+      // Store conversation ID
+      if (data.conversationId) {
+        setConversationId(data.conversationId);
+      }
+
+      // Add bot response
       const botMessage = {
         id: Date.now() + 1,
-        text: randomResponse,
-        sender: 'bot',
+        text: data.message,
+        sender: 'bot' as const,
         timestamp: Date.now()
       };
       setMessages(prev => [...prev, botMessage]);
       setBotMood(Math.random() > 0.5 ? 'excited' : 'happy');
-    }, 1500);
+
+      // Handle actions
+      if (data.actions && data.actions.length > 0 && onTriggerAction) {
+        data.actions.forEach((action: any) => {
+          onTriggerAction(action.type, action);
+        });
+      }
+
+    } catch (error: any) {
+      setIsTyping(false);
+      
+      // Handle rate limit error
+      if (error.message.includes('Too many')) {
+        setRateLimitError('Slow down there! 😅 Let\'s chat a bit slower.');
+      }
+
+      const errorMessage = {
+        id: Date.now() + 1,
+        text: error.message || "Oops! Something went wrong. Let's try that again! 😊",
+        sender: 'bot' as const,
+        timestamp: Date.now()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -217,6 +273,11 @@ const Chatbot = () => {
 
           {/* Input */}
           <div className="p-4 border-t border-gray-100 bg-white/80 backdrop-blur-md">
+            {rateLimitError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm text-center">
+                {rateLimitError}
+              </div>
+            )}
             <div className="flex items-center space-x-3">
               <input
                 type="text"
@@ -224,16 +285,20 @@ const Chatbot = () => {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message... 💭"
+                maxLength={500}
                 className="flex-1 px-4 py-3 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-300 text-sm"
               />
               <button
                 onClick={handleSendMessage}
-                disabled={!inputValue.trim()}
+                disabled={!inputValue.trim() || isTyping}
                 className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-2xl hover:shadow-lg hover:scale-110 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center"
               >
                 <Send className="w-5 h-5" />
               </button>
             </div>
+            <p className="text-xs text-gray-400 mt-2 text-center">
+              {inputValue.length}/500 characters
+            </p>
           </div>
         </div>
       )}
