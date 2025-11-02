@@ -24,6 +24,7 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
   const [showSearchResults, setShowSearchResults] = React.useState(false);
   const [isSearching, setIsSearching] = React.useState(false);
   const [searchType, setSearchType] = React.useState<'all' | 'prompts' | 'users'>('all');
+  const [showMobileSearch, setShowMobileSearch] = React.useState(false);
 
   React.useEffect(() => {
     const checkMobile = () => {
@@ -75,6 +76,7 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
   const handlePromptClick = (prompt: any) => {
     setShowSearchResults(false);
     setSearchQuery('');
+    setShowMobileSearch(false);
     if (onViewPrompt) {
       onViewPrompt(prompt.id);
     }
@@ -84,6 +86,7 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
   const handleUserClick = (user: any) => {
     setShowSearchResults(false);
     setSearchQuery('');
+    setShowMobileSearch(false);
     if (onViewCreator) {
       onViewCreator(user);
     }
@@ -249,7 +252,10 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
           <div className={`flex items-center ${isMobile ? 'space-x-1' : 'space-x-2'}`}>
             {/* Mobile Search Icon */}
             {isMobile && (
-              <button className="p-2 hover:bg-gray-100 rounded-full transition-all duration-300 hover:scale-110">
+              <button 
+                onClick={() => setShowMobileSearch(true)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-all duration-300 hover:scale-110"
+              >
                 <Search className="w-5 h-5 text-gray-600" />
               </button>
             )}
@@ -387,6 +393,169 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
             setShowMainMenu(false);
           }}
         ></div>
+      )}
+
+      {/* Full-Screen Mobile Search Modal */}
+      {showMobileSearch && (
+        <div className="fixed inset-0 z-50 bg-white">
+          <div className="flex flex-col h-full">
+            {/* Search Header */}
+            <div className="flex items-center gap-3 p-4 border-b border-gray-200">
+              <button
+                onClick={() => {
+                  setShowMobileSearch(false);
+                  setSearchQuery('');
+                  setSearchResults({ prompts: [], users: [] });
+                }}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="Search prompts and users..."
+                  autoFocus
+                  className="w-full pl-10 pr-10 py-2.5 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all text-gray-700 placeholder-gray-400"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => {
+                      setSearchQuery('');
+                      setSearchResults({ prompts: [], users: [] });
+                    }}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex items-center gap-2 p-4 border-b border-gray-100 bg-gray-50">
+              <button
+                onClick={() => setSearchType('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  searchType === 'all'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setSearchType('prompts')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  searchType === 'prompts'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Prompts ({searchResults.prompts.length})
+              </button>
+              <button
+                onClick={() => setSearchType('users')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  searchType === 'users'
+                    ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-md'
+                    : 'bg-white text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                Users ({searchResults.users.length})
+              </button>
+            </div>
+
+            {/* Search Results */}
+            <div className="flex-1 overflow-y-auto">
+              {isSearching ? (
+                <div className="flex flex-col items-center justify-center p-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+                  <p className="text-gray-500 mt-4">Searching...</p>
+                </div>
+              ) : searchQuery.length < 2 ? (
+                <div className="flex flex-col items-center justify-center p-12 text-center">
+                  <Search className="w-16 h-16 text-gray-300 mb-4" />
+                  <p className="text-gray-500 text-lg font-medium">Start typing to search</p>
+                  <p className="text-gray-400 text-sm mt-2">Search for prompts and creators</p>
+                </div>
+              ) : (
+                <>
+                  {/* Prompts Results */}
+                  {(searchType === 'all' || searchType === 'prompts') && searchResults.prompts.length > 0 && (
+                    <div className="p-4 border-b border-gray-100">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Prompts ({searchResults.prompts.length})</h3>
+                      <div className="space-y-2">
+                        {searchResults.prompts.slice(0, searchType === 'prompts' ? 20 : 5).map((prompt: any) => (
+                          <button
+                            key={prompt.id}
+                            onClick={() => {
+                              handlePromptClick(prompt);
+                              setShowMobileSearch(false);
+                            }}
+                            className="w-full p-3 hover:bg-gray-50 active:bg-gray-100 rounded-xl transition-colors text-left flex items-center gap-3 border border-gray-200"
+                          >
+                            <img
+                              src={prompt.imageUrl || `https://picsum.photos/seed/${prompt.id}/600/400`}
+                              alt={prompt.title}
+                              className="w-16 h-16 rounded-lg object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm mb-1 truncate">{prompt.title}</p>
+                              <p className="text-xs text-gray-500 line-clamp-2">{prompt.content}</p>
+                              <span className="inline-block mt-1 text-xs text-purple-600 bg-purple-50 px-2 py-0.5 rounded">{prompt.category}</span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Users Results */}
+                  {(searchType === 'all' || searchType === 'users') && searchResults.users.length > 0 && (
+                    <div className="p-4">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase mb-3">Users ({searchResults.users.length})</h3>
+                      <div className="space-y-2">
+                        {searchResults.users.slice(0, searchType === 'users' ? 20 : 5).map((user: any) => (
+                          <button
+                            key={user.email}
+                            onClick={() => {
+                              handleUserClick(user);
+                              setShowMobileSearch(false);
+                            }}
+                            className="w-full p-3 hover:bg-gray-50 active:bg-gray-100 rounded-xl transition-colors text-left flex items-center gap-3 border border-gray-200"
+                          >
+                            <img
+                              src={user.profilePhoto || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}`}
+                              alt={user.name}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 text-sm">{user.name}</p>
+                              <p className="text-xs text-gray-500">@{user.userId}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Results */}
+                  {searchResults.prompts.length === 0 && searchResults.users.length === 0 && searchQuery.length >= 2 && !isSearching && (
+                    <div className="flex flex-col items-center justify-center p-12 text-center">
+                      <Search className="w-16 h-16 text-gray-300 mb-4" />
+                      <p className="text-gray-500 text-lg font-medium">No results found</p>
+                      <p className="text-gray-400 text-sm mt-2">Try searching with different keywords</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </header>
   );
