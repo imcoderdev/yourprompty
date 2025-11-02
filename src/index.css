@@ -199,6 +199,28 @@
       transform: scale(1);
     }
   }
+
+  @keyframes flashlight {
+    0% {
+      box-shadow: 100px 8px 30px -10px rgba(168, 85, 247, 0.4), 
+                  120px 8px 40px -10px rgba(236, 72, 153, 0.3), 
+                  140px 8px 50px -10px rgba(59, 130, 246, 0.2);
+    }
+    50% {
+      box-shadow: -100px 8px 30px -10px rgba(168, 85, 247, 0.4), 
+                  -120px 8px 40px -10px rgba(236, 72, 153, 0.3), 
+                  -140px 8px 50px -10px rgba(59, 130, 246, 0.2);
+    }
+    100% {
+      box-shadow: 100px 8px 30px -10px rgba(168, 85, 247, 0.4), 
+                  120px 8px 40px -10px rgba(236, 72, 153, 0.3), 
+                  140px 8px 50px -10px rgba(59, 130, 246, 0.2);
+    }
+  }
+
+  .animate-flashlight {
+    animation: flashlight 4s ease-in-out infinite;
+  }
 }
 
 /* Custom scrollbar */
