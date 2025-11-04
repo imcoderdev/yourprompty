@@ -5,6 +5,7 @@ import authRoutes from './routes/auth.js';
 import promptsRoutes from './routes/prompts.js';
 import usersRoutes from './routes/users.js';
 import chatRoutes from './routes/chat.js';
+import recommendationsRoutes from './routes/recommendations.js';
 import { initDb } from './db.js';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/prompts', promptsRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/recommendations', recommendationsRoutes);
 
 initDb()
   .then(() => {

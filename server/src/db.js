@@ -107,6 +107,40 @@ export async function initDb() {
       CONSTRAINT fk_followee FOREIGN KEY (followee_email) REFERENCES users(email) ON DELETE CASCADE
     );
   `;
+
+  // Create user_interactions table for tracking behavior
+  await sql`
+    CREATE TABLE IF NOT EXISTS user_interactions (
+      id BIGSERIAL PRIMARY KEY,
+      user_email VARCHAR(255) NOT NULL,
+      prompt_id BIGINT NOT NULL,
+      interaction_type VARCHAR(20) NOT NULL,
+      created_at TIMESTAMPTZ DEFAULT now(),
+      CONSTRAINT uq_interaction UNIQUE (user_email, prompt_id, interaction_type),
+      CONSTRAINT fk_interaction_user FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE,
+      CONSTRAINT fk_interaction_prompt FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_user_interactions_user ON user_interactions (user_email)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_user_interactions_prompt ON user_interactions (prompt_id)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_user_interactions_type ON user_interactions (interaction_type)`;
+
+  // Create recommendation_cache table
+  await sql`
+    CREATE TABLE IF NOT EXISTS recommendation_cache (
+      id BIGSERIAL PRIMARY KEY,
+      user_email VARCHAR(255) NOT NULL,
+      prompt_id BIGINT NOT NULL,
+      score NUMERIC(5,2) NOT NULL,
+      reason VARCHAR(100),
+      updated_at TIMESTAMPTZ DEFAULT now(),
+      CONSTRAINT uq_recommendation UNIQUE (user_email, prompt_id),
+      CONSTRAINT fk_rec_user FOREIGN KEY (user_email) REFERENCES users(email) ON DELETE CASCADE,
+      CONSTRAINT fk_rec_prompt FOREIGN KEY (prompt_id) REFERENCES prompts(id) ON DELETE CASCADE
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_recommendation_cache_user ON recommendation_cache (user_email)`;
+  await sql`CREATE INDEX IF NOT EXISTS idx_recommendation_cache_score ON recommendation_cache (score DESC)`;
 }
 
 export async function getConnection() {
