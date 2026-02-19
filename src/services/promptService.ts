@@ -14,6 +14,8 @@ import type { PromptWithAuthor, PromptFilters, CreatePromptInput } from '../type
 
 export async function getPrompts(filters?: PromptFilters) {
   try {
+    console.log('🔍 getPrompts called with filters:', filters);
+    
     let query = supabase
       .from('prompts')
       .select(`
@@ -55,8 +57,14 @@ export async function getPrompts(filters?: PromptFilters) {
 
     const { data, error } = await query;
 
+    console.log('📦 Prompts query result:', { 
+      dataCount: data?.length || 0, 
+      error: error?.message || null,
+      data: data 
+    });
+
     if (error) {
-      console.error('Error fetching prompts:', error);
+      console.error('❌ Error fetching prompts:', error);
       return { data: null, error };
     }
 

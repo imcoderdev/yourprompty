@@ -92,13 +92,19 @@ function App() {
   // Load prompts from Supabase
   const loadPrompts = async () => {
     try {
+      console.log('🚀 App: Loading prompts...');
       const { data, error } = await getPrompts({ 
         orderBy: 'created_at', 
         orderDirection: 'desc' 
       });
       
+      console.log('📊 App: getPrompts returned:', { 
+        dataCount: data?.length || 0, 
+        error: error?.message || null 
+      });
+      
       if (error) {
-        console.error('Error loading prompts:', error);
+        console.error('❌ App: Error loading prompts:', error);
         setFeedItems([]);
         return;
       }
@@ -122,9 +128,10 @@ function App() {
         liked: p.liked || false,
       }));
       
+      console.log('✅ App: Mapped prompts:', mapped.length, 'items');
       setFeedItems(mapped);
     } catch (error) {
-      console.error('Error loading prompts:', error);
+      console.error('💥 App: Exception loading prompts:', error);
       setFeedItems([]);
     }
   };
