@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { Sparkles, Image as ImageIcon, Upload, Check, X, ArrowLeft } from 'lucide-react';
+import { uploadPromptImage } from '../services/storageService';
+import { createPrompt } from '../services/promptService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UploadPromptPageProps {
   onCancel: () => void;
@@ -31,6 +34,7 @@ const ALLOWED_CATEGORIES = [
 ];
 
 const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated }) => {
+  const { user, session } = useAuth();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('General');
@@ -38,12 +42,22 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
   const [preview, setPreview] = useState<string | null>(null);
   const [agree, setAgree] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    
+    if (!user) {
+      setError('You must be signed in to create a prompt');
+      return;
+    }
+    if (!session?.access_token) {
+      setError('Session expired. Please sign in again.');
+      return;
+    }
     if (!title.trim() || !content.trim()) {
       setError('Please fill title and content');
       return;
@@ -56,30 +70,41 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
       setError('You must agree to the disclaimer before uploading');
       return;
     }
+    
     setLoading(true);
+    
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('You must be logged in');
-      const form = new FormData();
-      form.append('title', title);
-      form.append('content', content);
-      form.append('category', category);
-      form.append('image', file);
-      const baseUrl = 'http://localhost:4000';
-      const res = await fetch(`${baseUrl}/api/prompts`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
-      });
-      if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg?.message || 'Failed to create prompt');
+      // Step 1: Upload image to Supabase Storage
+      setUploadProgress('Uploading image...');
+      const { url: imageUrl, path: imagePath, error: uploadError } = await uploadPromptImage(file, user.id, session.access_token);
+      
+      if (uploadError) {
+        throw new Error(uploadError.message || 'Failed to upload image');
       }
-      const data = await res.json();
+      
+      // Step 2: Create prompt in database
+      setUploadProgress('Creating prompt...');
+      const { data, error: createError } = await createPrompt({
+        title: title.trim(),
+        content: content.trim(),
+        category,
+        imageUrl: imageUrl || undefined,
+        imagePath: imagePath || undefined,
+        userId: user.id,
+        userEmail: user.email || '',
+        accessToken: session.access_token
+      });
+      
+      if (createError) {
+        throw new Error(createError.message || 'Failed to create prompt');
+      }
+      
+      console.log('✅ Prompt created successfully:', data);
       
       // Show success message before closing
       setSuccess(true);
       setLoading(false);
+      setUploadProgress('');
       setError(null);
       
       // Wait a moment to show success before redirecting
@@ -88,8 +113,10 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
       }, 1500);
       
     } catch (err: any) {
+      console.error('Error creating prompt:', err);
       setError(err?.message || 'Something went wrong');
       setLoading(false);
+      setUploadProgress('');
     }
   };
 
@@ -281,7 +308,7 @@ const UploadPromptPage: React.FC<UploadPromptPageProps> = ({ onCancel, onCreated
                 {loading ? (
                   <>
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                    <span>Publishing...</span>
+                    <span>{uploadProgress || 'Publishing...'}</span>
                   </>
                 ) : (
                   <>

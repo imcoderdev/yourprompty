@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Heart, Copy, Instagram, Twitter, Linkedin, Github, Youtube, Globe, Check } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { getPublicProfileByEmail, toggleFollow, isFollowing as checkIsFollowing } from '../services/profileService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PublicProfilePageProps {
   email: string;
@@ -8,11 +10,12 @@ interface PublicProfilePageProps {
 }
 
 const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) => {
-  const baseUrl = 'http://localhost:4000';
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{
     user: { 
+      id: string;
       name: string; 
       userId?: string;
       profilePhoto?: string;
@@ -28,7 +31,7 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
     stats: { followers: number; following: number; totalLikes: number; promptsCount: number };
     prompts: Array<{ id: number; title: string; content: string; category: string; imageUrl: string | null; likeCount: number; commentCount: number; createdAt: string }>;
   } | null>(null);
-  const [isFollowing, setIsFollowing] = useState<boolean>(false);
+  const [isFollowingState, setIsFollowingState] = useState<boolean>(false);
   const [isSelf, setIsSelf] = useState<boolean>(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
 
@@ -37,27 +40,51 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
       try {
         setLoading(true);
         setError(null);
-        // Get current user for self-check
-        const token = localStorage.getItem('token');
-        let currentEmail: string | null = null;
-        if (token) {
-          try {
-            const meRes = await fetch(`${baseUrl}/api/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
-            if (meRes.ok) {
-              const me = await meRes.json();
-              currentEmail = me?.email || null;
-            }
-          } catch {}
-        }
-        setIsSelf(!!currentEmail && currentEmail === email);
+        
+        // Self-check using auth context
+        setIsSelf(!!user && user.email === email);
 
-        const res = await fetch(`${baseUrl}/api/users/${encodeURIComponent(email)}/profile`);
-        if (!res.ok) {
-          const msg = await res.json().catch(() => ({}));
-          throw new Error(msg?.message || 'Failed to load profile');
+        // Fetch profile from Supabase
+        const { data, error: profileError } = await getPublicProfileByEmail(email);
+        
+        if (profileError || !data) {
+          throw new Error(profileError?.message || 'Failed to load profile');
         }
-        const data = await res.json();
-        setProfile(data);
+
+        const p = data.profile;
+        setProfile({
+          user: {
+            id: p.id,
+            name: p.name,
+            userId: p.user_id,
+            profilePhoto: p.profile_photo,
+            tagline: p.tagline,
+            instagram: p.instagram,
+            twitter: p.twitter,
+            linkedin: p.linkedin,
+            github: p.github,
+            youtube: p.youtube,
+            tiktok: p.tiktok,
+            website: p.website
+          },
+          stats: data.stats,
+          prompts: (data.prompts || []).map((pr: any) => ({
+            id: pr.id,
+            title: pr.title,
+            content: pr.content,
+            category: pr.category || 'General',
+            imageUrl: pr.image_url || null,
+            likeCount: pr.like_count || 0,
+            commentCount: pr.comment_count || 0,
+            createdAt: pr.created_at
+          }))
+        });
+
+        // Check if current user is following this profile
+        if (user && p.id !== user.id) {
+          const following = await checkIsFollowing(p.id);
+          setIsFollowingState(following);
+        }
       } catch (err: any) {
         setError(err?.message || 'Something went wrong');
       } finally {
@@ -65,32 +92,30 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
       }
     };
     run();
-  }, [email]);
+  }, [email, user]);
 
   const handleFollowToggle = async () => {
-    const token = localStorage.getItem('token');
-    if (!token) {
+    if (!user) {
       setError('Please sign in to follow users');
       return;
     }
+    if (!profile?.user?.id) return;
+    
     try {
       setError(null);
-      const method = isFollowing ? 'DELETE' : 'POST';
-      const res = await fetch(`${baseUrl}/api/users/${encodeURIComponent(email)}/follow`, {
-        method,
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg?.message || 'Action failed');
+      const { following, error: followError } = await toggleFollow(profile.user.id);
+      
+      if (followError) {
+        throw new Error(followError?.message || 'Action failed');
       }
-      setIsFollowing(!isFollowing);
+      
+      setIsFollowingState(following);
       // Optimistically update counters
       setProfile((prev) => prev ? ({
         ...prev,
         stats: { 
           ...prev.stats, 
-          followers: prev.stats.followers + (isFollowing ? -1 : 1) 
+          followers: prev.stats.followers + (isFollowingState ? -1 : 1) 
         }
       }) : prev);
     } catch (err: any) {
@@ -123,7 +148,7 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
     const p = profile?.user;
     if (p?.profilePhoto) {
       const url = String(p.profilePhoto);
-      return url.startsWith('http') ? url : `${baseUrl}${url}`;
+      return url.startsWith('http') ? url : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p?.name || 'U')}`;
     }
     const name = p?.name || 'U';
     return `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(name)}`;
@@ -326,12 +351,12 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
               <button 
                 onClick={handleFollowToggle} 
                 className={`px-6 py-3 rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all hover:scale-105 ${
-                  isFollowing 
+                  isFollowingState 
                     ? 'bg-gray-200 text-gray-800 hover:bg-gray-300' 
                     : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white hover:from-purple-700 hover:to-pink-700'
                 }`}
               >
-                {isFollowing ? '✓ Following' : '+ Follow'}
+                {isFollowingState ? '✓ Following' : '+ Follow'}
               </button>
             )}
           </div>
@@ -358,7 +383,7 @@ const PublicProfilePage: React.FC<PublicProfilePageProps> = ({ email, onBack }) 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {profile.prompts.map((p) => {
                 const img = p.imageUrl
-                  ? (String(p.imageUrl).startsWith('http') ? p.imageUrl : `${baseUrl}${p.imageUrl}`)
+                  ? (String(p.imageUrl).startsWith('http') ? p.imageUrl : null)
                   : null;
                 const isCopied = copiedId === p.id;
                 return (

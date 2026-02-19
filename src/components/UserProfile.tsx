@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Mail, Settings, Heart, Copy, CreditCard as Edit3, Camera, Sparkles, Crown, Plus, Instagram, Twitter, Linkedin, Github, Youtube, Globe, Music } from 'lucide-react';
+import { getUserProfileWithStats, updateProfile as updateProfileService } from '../services/profileService';
+import { uploadProfilePhoto } from '../services/storageService';
+import { deletePrompt } from '../services/promptService';
+import { useAuth } from '../contexts/AuthContext';
 
 interface UserProfileProps {
   user: any;
@@ -8,7 +12,7 @@ interface UserProfileProps {
 }
 
 const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload }) => {
-  const baseUrl = 'http://localhost:4000';
+  const { refreshProfile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [profileData, setProfileData] = useState<any>({
     name: user?.name || '',
@@ -34,53 +38,59 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
     const load = async () => {
       try {
         setError(null);
-        const token = localStorage.getItem('token');
-        if (!token) return;
-        const res = await fetch(`${baseUrl}/api/users/me/profile`, { headers: { Authorization: `Bearer ${token}` } });
-        if (!res.ok) {
-          const msg = await res.json().catch(() => ({}));
-          throw new Error(msg?.message || 'Failed to load profile');
+        
+        const { data, error: loadError } = await getUserProfileWithStats();
+        
+        if (loadError) {
+          throw new Error(loadError.message || 'Failed to load profile');
         }
-        const data = await res.json();
-        const avatar = data?.user?.profilePhoto
-          ? (String(data.user.profilePhoto).startsWith('/') ? `${baseUrl}${data.user.profilePhoto}` : data.user.profilePhoto)
-          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data?.user?.name || 'U')}`;
+        
+        if (!data) {
+          throw new Error('No profile data found');
+        }
+        
+        const { profile, stats: profileStats, prompts: userPrompts } = data;
+        
+        const avatar = profile.profile_photo || 
+          `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(profile.name || 'U')}`;
+        
         setProfileData({
-          name: data.user.name,
-          email: data.user.email,
-          userId: data.user.userId,
+          name: profile.name,
+          email: profile.email,
+          userId: profile.user_id,
           avatar,
-          tagline: data.user.tagline || '',
-          instagram: data.user.instagram || '',
-          twitter: data.user.twitter || '',
-          linkedin: data.user.linkedin || '',
-          github: data.user.github || '',
-          youtube: data.user.youtube || '',
-          tiktok: data.user.tiktok || '',
-          website: data.user.website || ''
+          tagline: profile.tagline || '',
+          instagram: profile.instagram || '',
+          twitter: profile.twitter || '',
+          linkedin: profile.linkedin || '',
+          github: profile.github || '',
+          youtube: profile.youtube || '',
+          tiktok: profile.tiktok || '',
+          website: profile.website || ''
         });
+        
         setStats({
-          prompts: data.stats.promptsCount,
-          followers: data.stats.followers,
-          following: data.stats.following,
-          totalLikes: data.stats.totalLikes
+          prompts: profileStats.promptsCount,
+          followers: profileStats.followers,
+          following: profileStats.following,
+          totalLikes: profileStats.totalLikes
         });
-        const mapped = (data.prompts || []).map((p: any) => {
-          const img = p.imageUrl
-            ? (String(p.imageUrl).startsWith('http') ? p.imageUrl : `${baseUrl}${p.imageUrl}`)
-            : `https://picsum.photos/seed/${p.id}/600/400`;
+        
+        const mapped = (userPrompts || []).map((p: any) => {
+          const img = p.image_url || `https://picsum.photos/seed/${p.id}/600/400`;
           return {
             id: p.id,
             title: p.title,
             prompt: p.content,
             result: img,
-            likes: p.likeCount,
-            uses: p.commentCount,
+            likes: p.like_count || 0,
+            uses: p.comment_count || 0,
             category: p.category
           };
         });
         setPrompts(mapped);
       } catch (e: any) {
+        console.error('Error loading profile:', e);
         setError(e?.message || 'Something went wrong');
       }
     };
@@ -96,36 +106,53 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
     setSaving(true);
     const run = async () => {
       try {
-        const token = localStorage.getItem('token');
-        if (!token) throw new Error('Not authenticated');
-        const form = new FormData();
-        if (profileData.userId) form.append('userId', profileData.userId);
-        if (profileData.tagline) form.append('tagline', profileData.tagline);
-        if (profileData.instagram) form.append('instagram', profileData.instagram);
-        if (profileData.twitter) form.append('twitter', profileData.twitter);
-        if (profileData.linkedin) form.append('linkedin', profileData.linkedin);
-        if (profileData.github) form.append('github', profileData.github);
-        if (profileData.youtube) form.append('youtube', profileData.youtube);
-        if (profileData.tiktok) form.append('tiktok', profileData.tiktok);
-        if (profileData.website) form.append('website', profileData.website);
-        if (newPhoto) form.append('profilePhoto', newPhoto);
-        const res = await fetch(`${baseUrl}/api/users/me`, {
-          method: 'PATCH',
-          headers: { Authorization: `Bearer ${token}` },
-          body: form
-        });
-        if (!res.ok) {
-          const msg = await res.json().catch(() => ({}));
-          throw new Error(msg?.message || 'Failed to update profile');
+        let photoUrl = profileData.avatar;
+        
+        // Upload new photo if selected
+        if (newPhoto) {
+          const { url, error: uploadError } = await uploadProfilePhoto(newPhoto);
+          if (uploadError) {
+            throw new Error(uploadError.message || 'Failed to upload photo');
+          }
+          if (url) {
+            photoUrl = url;
+          }
         }
-        const u = await res.json();
-        const avatar = u?.profilePhoto
-          ? (String(u.profilePhoto).startsWith('/') ? `${baseUrl}${u.profilePhoto}` : u.profilePhoto)
-          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(u?.name || 'U')}`;
-        setProfileData((prev: any) => ({ ...prev, userId: u.userId, avatar }));
+        
+        // Update profile via Supabase
+        const { data: updatedProfile, error: updateError } = await updateProfileService({
+          user_id: profileData.userId,
+          tagline: profileData.tagline || null,
+          profile_photo: newPhoto ? photoUrl : undefined,
+          instagram: profileData.instagram || null,
+          twitter: profileData.twitter || null,
+          linkedin: profileData.linkedin || null,
+          github: profileData.github || null,
+          youtube: profileData.youtube || null,
+          tiktok: profileData.tiktok || null,
+          website: profileData.website || null
+        });
+        
+        if (updateError) {
+          throw new Error(updateError.message || 'Failed to update profile');
+        }
+        
+        // Update local state
+        if (updatedProfile) {
+          setProfileData((prev: any) => ({ 
+            ...prev, 
+            userId: updatedProfile.user_id,
+            avatar: updatedProfile.profile_photo || prev.avatar
+          }));
+        }
+        
+        // Refresh the auth context profile
+        await refreshProfile();
+        
         setIsEditing(false);
         setNewPhoto(null);
       } catch (e: any) {
+        console.error('Error saving profile:', e);
         setError(e?.message || 'Something went wrong');
       } finally {
         setSaving(false);
@@ -146,19 +173,16 @@ const UserProfile: React.FC<UserProfileProps> = ({ user, onBack, onShowUpload })
 
   const handleDeletePrompt = async (id: number) => {
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('Not authenticated');
-      const res = await fetch(`${baseUrl}/api/prompts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg?.message || 'Failed to delete');
+      const { error: deleteError } = await deletePrompt(id);
+      
+      if (deleteError) {
+        throw new Error(deleteError.message || 'Failed to delete');
       }
+      
       setPrompts(prev => prev.filter(p => p.id !== id));
       setStats(prev => ({ ...prev, prompts: Math.max(0, (prev.prompts || 1) - 1) }));
     } catch (e: any) {
+      console.error('Error deleting prompt:', e);
       setError(e?.message || 'Something went wrong');
     }
   };

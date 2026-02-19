@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Heart, Copy, Users, Check, ExternalLink } from 'lucide-react';
 import { toast } from 'react-toastify';
+import { toggleLike, trackInteraction } from '../services/promptService';
 import AIModelSelector from './AIModelSelector';
 
 interface PromptCardProps {
@@ -51,6 +52,9 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
     setShowRipple(true);
     setCopyScale(1.3);
     
+    // Track copy interaction
+    trackInteraction(prompt.id, 'copy');
+    
     toast.success('Prompt copied to clipboard!', {
       position: "top-right",
       autoClose: 2000,
@@ -86,27 +90,35 @@ const PromptCard: React.FC<PromptCardProps> = ({ prompt, onViewCreator, index, i
     }
     
     if (isLiking) return;
-    const token = localStorage.getItem('token');
+    
     // Optimistic update
     const next = !isLiked;
     setIsLiked(next);
     setLikesCount((c) => c + (next ? 1 : -1));
 
-    if (!token) return;
     setIsLiking(true);
     try {
-      const res = await fetch(`http://localhost:4000/api/prompts/${prompt.id}/like`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (!res.ok) throw new Error('Failed');
-      const data = await res.json();
-      if (typeof data.liked === 'boolean') setIsLiked(data.liked);
-      if (typeof data.likeCount === 'number') setLikesCount(data.likeCount);
-    } catch {
+      const { data, error } = await toggleLike(prompt.id);
+      
+      if (error) {
+        throw new Error(error.message || 'Failed to update like');
+      }
+      
+      // Update with actual data from server
+      if (data) {
+        setIsLiked(data.liked);
+        setLikesCount(data.likeCount);
+      }
+    } catch (err) {
+      console.error('Like error:', err);
       // Revert on failure
       setIsLiked((prev) => !prev);
       setLikesCount((c) => c + (next ? -1 : 1));
+      
+      toast.error('Failed to update like. Please try again.', {
+        position: "top-right",
+        autoClose: 2000,
+      });
     } finally {
       setIsLiking(false);
     }

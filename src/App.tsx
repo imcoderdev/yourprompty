@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { useAuth } from './contexts/AuthContext';
+import { getAvatarUrl } from './types/supabase-types';
+import { getPrompts } from './services/promptService';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import PromptFeed from './components/PromptFeed';
@@ -10,84 +13,120 @@ import UserProfile from './components/UserProfile';
 import Footer from './components/Footer';
 import Chatbot from './components/Chatbot';
 import AuthModal from './components/AuthModal';
+import AuthCallback from './components/AuthCallback';
 import AIModelExplorer from './components/AIModelExplorer';
 import UploadPromptModal from './components/UploadPromptModal';
 import UploadPromptPage from './components/UploadPromptPage';
 import PublicProfilePage from './components/PublicProfilePage';
+import SettingsModal from './components/SettingsModal';
 
 function App() {
-  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'create-profile' | 'user-profile' | 'upload' | 'public-profile'>('home');
+  const { user, profile, signOut, loading } = useAuth();
+  const [currentView, setCurrentView] = useState<'home' | 'profile' | 'create-profile' | 'user-profile' | 'upload' | 'public-profile' | 'auth-callback'>('home');
   const [selectedCreator, setSelectedCreator] = useState<any>(null);
-  const [user, setUser] = useState<any>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showAIExplorer, setShowAIExplorer] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [authStartInSignup, setAuthStartInSignup] = useState(false);
   const [feedItems, setFeedItems] = useState<any[] | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const [highlightPromptId, setHighlightPromptId] = useState<number | null>(null);
 
+  // Debug logging
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-    const baseUrl = 'http://localhost:4000';
-    fetch(`${baseUrl}/api/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Session invalid');
-        const data = await res.json();
-        const avatar = data?.profilePhoto
-          ? (String(data.profilePhoto).startsWith('/') ? `${baseUrl}${data.profilePhoto}` : data.profilePhoto)
-          : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(data?.name || 'U')}`;
-        setUser({ ...data, avatar });
-      })
-      .catch(() => {
-        localStorage.removeItem('token');
-      });
+    console.log('App: Auth state -', { 
+      loading, 
+      hasUser: !!user, 
+      hasProfile: !!profile,
+      userEmail: user?.email,
+      profileName: profile?.name 
+    });
+  }, [loading, user, profile]);
+
+  // Check if we're on the auth callback route
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasAuthError = urlParams.has('error') || urlParams.has('error_code');
+    const hasAuthCallback = window.location.pathname === '/auth/callback' || 
+                           window.location.hash.includes('access_token') || 
+                           window.location.hash.includes('error');
+    
+    if (hasAuthCallback || hasAuthError) {
+      setCurrentView('auth-callback');
+    }
   }, []);
 
-  // Load prompts from backend
-  const loadPrompts = () => {
-    const baseUrl = 'http://localhost:4000';
-    const token = localStorage.getItem('token');
-    const headers: Record<string, string> = {};
-    
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-    
-    fetch(`${baseUrl}/api/prompts`, { headers })
-      .then(res => {
-        console.log('Prompts API response status:', res.status);
-        return res.json();
-      })
-      .then((rows) => {
-        console.log('Prompts data received:', rows);
-        const mapped = (rows || []).map((p: any, idx: number) => ({
-          id: p.id,
-          title: p.title,
-          prompt: p.content,
-          result: p.imageUrl || `https://picsum.photos/seed/${p.id}/800/600`,
-          category: p.category || 'General',
-          creator: {
-            name: p.author?.name || p.author_name || 'Creator',
-            email: p.author?.email || p.author_email,
-            avatar: p.author?.profilePhoto
-              ? (String(p.author.profilePhoto).startsWith('http') ? p.author.profilePhoto : `${window.location.origin}${p.author.profilePhoto}`)
-              : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.author?.name || 'U')}`,
-            username: `@${(p.author?.name || 'user').toLowerCase().replace(/\s+/g,'')}`,
-            verified: false,
-          },
-          likes: Number(p.likeCount ?? 0),
-          uses: Number(p.commentCount ?? 0),
-          liked: !!p.liked,
-        }));
-        setFeedItems(mapped);
-      })
-      .catch((error) => {
+  // Convert profile to user object format for existing components
+  // Fall back to user data if profile isn't loaded yet (shows logged-in state faster)
+  const currentUser = profile ? {
+    email: profile.email,
+    name: profile.name,
+    userId: profile.user_id,
+    avatar: getAvatarUrl(profile),
+    profilePhoto: profile.profile_photo,
+    tagline: profile.tagline,
+    instagram: profile.instagram,
+    twitter: profile.twitter,
+    linkedin: profile.linkedin,
+    github: profile.github,
+    youtube: profile.youtube,
+    tiktok: profile.tiktok,
+    website: profile.website
+  } : user ? {
+    // Fallback: use auth user data when profile isn't loaded yet
+    email: user.email || '',
+    name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+    userId: user.email?.split('@')[0]?.toLowerCase() || '',
+    avatar: user.user_metadata?.avatar_url || user.user_metadata?.picture || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.email || 'U')}`,
+    profilePhoto: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+    tagline: null,
+    instagram: null,
+    twitter: null,
+    linkedin: null,
+    github: null,
+    youtube: null,
+    tiktok: null,
+    website: null
+  } : null;
+
+  // Load prompts from Supabase
+  const loadPrompts = async () => {
+    try {
+      const { data, error } = await getPrompts({ 
+        orderBy: 'created_at', 
+        orderDirection: 'desc' 
+      });
+      
+      if (error) {
         console.error('Error loading prompts:', error);
         setFeedItems([]);
-      });
+        return;
+      }
+
+      // Map to the format expected by PromptCard
+      const mapped = (data || []).map((p: any) => ({
+        id: p.id,
+        title: p.title,
+        prompt: p.content,
+        result: p.image_url || `https://picsum.photos/seed/${p.id}/800/600`,
+        category: p.category || 'General',
+        creator: {
+          name: p.author?.name || 'Creator',
+          email: p.author?.email || '',
+          avatar: p.author?.profile_photo || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(p.author?.name || 'U')}`,
+          username: `@${(p.author?.user_id || 'user').toLowerCase()}`,
+          verified: false,
+        },
+        likes: p.like_count || 0,
+        uses: p.comment_count || 0,
+        liked: p.liked || false,
+      }));
+      
+      setFeedItems(mapped);
+    } catch (error) {
+      console.error('Error loading prompts:', error);
+      setFeedItems([]);
+    }
   };
 
   useEffect(() => {
@@ -109,19 +148,11 @@ function App() {
     setShowAuthModal(true);
   };
 
-  const handleLogin = (userData: any) => {
-    const baseUrl = 'http://localhost:4000';
-    const avatar = userData?.profilePhoto
-      ? (String(userData.profilePhoto).startsWith('/') ? `${baseUrl}${userData.profilePhoto}` : userData.profilePhoto)
-      : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData?.name || 'U')}`;
-    setUser({ ...userData, avatar });
-    setShowAuthModal(false);
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    setUser(null);
+  const handleLogout = async () => {
+    console.log('handleLogout: Starting sign out...');
+    signOut(); // Don't await - signOut clears state immediately
     setCurrentView('home');
+    console.log('handleLogout: Done, navigated to home');
   };
 
   const handleShowAuth = () => {
@@ -138,35 +169,41 @@ function App() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
-      <Header 
-        onBackToHome={handleBackToHome} 
-        showBackButton={currentView === 'profile'} 
-        user={user}
-        onShowAuth={handleShowAuth}
-        onShowProfile={() => setCurrentView('user-profile')}
-        onShowAIExplorer={handleShowAIExplorer}
-        onShowUpload={handleShowUploadPage}
-        onLogout={handleLogout}
-        onViewCreator={handleViewCreator}
-        onViewPrompt={(promptId) => {
-          // Navigate to home and highlight the prompt
-          setHighlightPromptId(promptId);
-          setCurrentView('home');
-          setTimeout(() => {
-            const promptElement = document.getElementById(`prompt-${promptId}`);
-            if (promptElement) {
-              promptElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          }, 100);
-        }}
-      />
+      {/* Handle OAuth callback */}
+      {currentView === 'auth-callback' ? (
+        <AuthCallback onComplete={() => setCurrentView('home')} />
+      ) : (
+        <>
+          <Header 
+            onBackToHome={handleBackToHome} 
+            showBackButton={currentView === 'profile'} 
+            user={currentUser}
+            onShowAuth={handleShowAuth}
+            onShowProfile={() => setCurrentView('user-profile')}
+            onShowAIExplorer={handleShowAIExplorer}
+            onShowUpload={handleShowUploadPage}
+            onLogout={handleLogout}
+            onShowSettings={() => setShowSettings(true)}
+            onViewCreator={handleViewCreator}
+            onViewPrompt={(promptId) => {
+              // Navigate to home and highlight the prompt
+              setHighlightPromptId(promptId);
+              setCurrentView('home');
+              setTimeout(() => {
+                const promptElement = document.getElementById(`prompt-${promptId}`);
+                if (promptElement) {
+                  promptElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }, 100);
+            }}
+          />
       
       {currentView === 'home' ? (
         <>
-          {!user && (
+          {!currentUser && (
             <Hero onCreateProfile={handleCreateProfile} onShowAIExplorer={handleShowAIExplorer} />
           )}
-          {user && (
+          {currentUser && (
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
               <div className="flex justify-end">
                 <button
@@ -197,7 +234,7 @@ function App() {
       ) : currentView === 'public-profile' ? (
         <PublicProfilePage email={selectedCreator?.email} onBack={handleBackToHome} />
       ) : (
-        <UserProfile user={user} onBack={handleBackToHome} onShowUpload={handleShowUploadPage} />
+        <UserProfile user={currentUser} onBack={handleBackToHome} onShowUpload={handleShowUploadPage} />
       )}
       
       <Footer 
@@ -207,7 +244,7 @@ function App() {
         onShowAIExplorer={handleShowAIExplorer}
       />
       <Chatbot 
-        user={user}
+        user={currentUser}
         onTriggerAction={(actionType, actionData) => {
           console.log('Chatbot action:', actionType, actionData);
           // Handle different action types
@@ -228,7 +265,11 @@ function App() {
           }
         }}
       />
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} onLogin={handleLogin} startInSignup={authStartInSignup} />
+      <AuthModal 
+        isOpen={showAuthModal} 
+        onClose={() => setShowAuthModal(false)} 
+        startInSignup={authStartInSignup} 
+      />
       <UploadPromptModal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
@@ -237,7 +278,14 @@ function App() {
       {showAIExplorer && (
         <AIModelExplorer onClose={() => setShowAIExplorer(false)} />
       )}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onLogout={handleLogout}
+      />
       <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} newestOnTop closeOnClick pauseOnFocusLoss draggable pauseOnHover />
+        </>
+      )}
     </div>
   );
 }

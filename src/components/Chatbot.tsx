@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MessageCircle, X, Send, Sparkles, Heart, Star, Loader } from 'lucide-react';
+import { sendMessage } from '../services/chatService';
 
 interface Message {
   id: number;
@@ -24,7 +25,6 @@ const Chatbot: React.FC<ChatbotProps> = ({ user, onTriggerAction }) => {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [rateLimitError, setRateLimitError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const baseUrl = 'http://localhost:4000';
 
   const randomGreetings = [
     "Hiya! 👋",
@@ -81,42 +81,27 @@ const Chatbot: React.FC<ChatbotProps> = ({ user, onTriggerAction }) => {
     setRateLimitError(null);
 
     try {
-      const token = localStorage.getItem('token');
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json'
-      };
-      
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(`${baseUrl}/api/chat/message`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          message: inputValue,
-          context: 'Browsing home feed',
-          conversationId: conversationId
-        })
+      const { data, error } = await sendMessage({
+        message: inputValue,
+        context: 'Browsing home feed',
+        conversationId: conversationId
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to get response');
+      if (error) {
+        throw new Error(error.message || 'Failed to get response');
       }
 
       setIsTyping(false);
 
       // Store conversation ID
-      if (data.conversationId) {
+      if (data?.conversationId) {
         setConversationId(data.conversationId);
       }
 
       // Add bot response
       const botMessage = {
         id: Date.now() + 1,
-        text: data.message,
+        text: data?.message || "I'm here to help! What would you like to know?",
         sender: 'bot' as const,
         timestamp: Date.now()
       };
@@ -124,7 +109,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ user, onTriggerAction }) => {
       setBotMood(Math.random() > 0.5 ? 'excited' : 'happy');
 
       // Handle actions
-      if (data.actions && data.actions.length > 0 && onTriggerAction) {
+      if (data?.actions && data.actions.length > 0 && onTriggerAction) {
         data.actions.forEach((action: any) => {
           onTriggerAction(action.type, action);
         });
@@ -134,7 +119,7 @@ const Chatbot: React.FC<ChatbotProps> = ({ user, onTriggerAction }) => {
       setIsTyping(false);
       
       // Handle rate limit error
-      if (error.message.includes('Too many')) {
+      if (error.message?.includes('Too many')) {
         setRateLimitError('Slow down there! 😅 Let\'s chat a bit slower.');
       }
 

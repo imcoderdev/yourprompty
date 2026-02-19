@@ -1,5 +1,7 @@
 import React from 'react';
 import { Search, User, Menu, ArrowLeft, Bell, Settings, LogOut, UserPlus, Bot, X } from 'lucide-react';
+import { searchPrompts } from '../services/promptService';
+import { searchProfiles } from '../services/profileService';
 
 interface HeaderProps {
   onBackToHome: () => void;
@@ -10,11 +12,12 @@ interface HeaderProps {
   onShowAIExplorer: () => void;
   onShowUpload?: () => void;
   onLogout?: () => void;
+  onShowSettings?: () => void;
   onViewCreator?: (creator: any) => void;
   onViewPrompt?: (promptId: number) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onShowAuth, onShowProfile, onShowAIExplorer, onShowUpload, onLogout, onViewCreator, onViewPrompt }) => {
+const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onShowAuth, onShowProfile, onShowAIExplorer, onShowUpload, onLogout, onShowSettings, onViewCreator, onViewPrompt }) => {
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
   const [showMainMenu, setShowMainMenu] = React.useState(false);
   const [notifications, setNotifications] = React.useState(3);
@@ -48,22 +51,26 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
     setShowSearchResults(true);
 
     try {
-      const baseUrl = 'http://localhost:4000';
-      const token = localStorage.getItem('token');
+      // Search prompts via Supabase
+      const { data: promptsData } = await searchPrompts(query, 10);
       
-      // Search prompts
-      const promptsRes = await fetch(`${baseUrl}/api/prompts?search=${encodeURIComponent(query)}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      const promptsData = await promptsRes.json();
-      
-      // Search users
-      const usersRes = await fetch(`${baseUrl}/api/users/search?q=${encodeURIComponent(query)}`);
-      const usersData = await usersRes.json();
+      // Search users via Supabase
+      const { data: usersData } = await searchProfiles(query, 10);
 
       setSearchResults({
-        prompts: Array.isArray(promptsData) ? promptsData : [],
-        users: usersData.users || []
+        prompts: (promptsData || []).map((p: any) => ({
+          id: p.id,
+          title: p.title,
+          content: p.content,
+          category: p.category || 'General',
+          imageUrl: p.image_url || null
+        })),
+        users: (usersData || []).map((u: any) => ({
+          name: u.name,
+          email: u.email,
+          userId: u.user_id,
+          profilePhoto: u.profile_photo
+        }))
       });
     } catch (error) {
       console.error('Search error:', error);
@@ -287,15 +294,19 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
 
               {/* Profile Dropdown */}
               {showProfileMenu && (
-                <div className={`absolute right-0 top-full mt-2 ${isMobile ? 'w-56' : 'w-64'} bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 py-2 animate-fade-in-up`}>
+                <div className={`absolute right-0 top-full mt-2 ${isMobile ? 'w-56' : 'w-64'} bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 py-2 animate-fade-in-up z-50`}>
                   <div className="px-4 py-3 border-b border-gray-100">
                     <div className="flex items-center space-x-3">
-                      <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full flex items-center justify-center">
-                        <User className="w-6 h-6 text-white" />
+                      <div className="w-12 h-12 bg-gradient-to-r from-purple-400 to-pink-400 rounded-full overflow-hidden flex items-center justify-center">
+                        {user ? (
+                          <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                        ) : (
+                          <User className="w-6 h-6 text-white" />
+                        )}
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">Welcome!</p>
-                        <p className="text-sm text-gray-500">Ready to create?</p>
+                        <p className="font-semibold text-gray-900">{user ? user.name : 'Welcome!'}</p>
+                        <p className="text-sm text-gray-500">{user ? user.email : 'Ready to create?'}</p>
                       </div>
                     </div>
                   </div>
@@ -313,7 +324,9 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
                           <User className="w-4 h-4 text-gray-500 group-hover:text-purple-600 transition-colors duration-200" />
                           <span className="text-gray-700 group-hover:text-gray-900">My Profile</span>
                         </button>
-                        <button className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-3 group">
+                        <button 
+                          onClick={() => { onShowSettings?.(); setShowProfileMenu(false); }}
+                          className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-200 flex items-center space-x-3 group">
                           <Settings className="w-4 h-4 text-gray-500 group-hover:text-purple-600 transition-colors duration-200" />
                           <span className="text-gray-700 group-hover:text-gray-900">Settings</span>
                         </button>
@@ -353,7 +366,7 @@ const Header: React.FC<HeaderProps> = ({ onBackToHome, showBackButton, user, onS
 
               {/* Main Menu Dropdown */}
               {showMainMenu && (
-                <div className={`absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 py-2 animate-fade-in-up`}>
+                <div className={`absolute right-0 top-full mt-2 w-56 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-100 py-2 animate-fade-in-up z-50`}>
                   <button 
                     onClick={onShowAIExplorer}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors duration-200 text-gray-700 hover:text-gray-900 flex items-center space-x-3"

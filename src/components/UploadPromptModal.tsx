@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { uploadPromptImage } from '../services/storageService';
+import { createPrompt } from '../services/promptService';
 
 interface UploadPromptModalProps {
   isOpen: boolean;
@@ -8,6 +11,7 @@ interface UploadPromptModalProps {
 }
 
 const UploadPromptModal: React.FC<UploadPromptModalProps> = ({ isOpen, onClose, onCreated }) => {
+  const { user, session } = useAuth();
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('General');
@@ -25,26 +29,29 @@ const UploadPromptModal: React.FC<UploadPromptModalProps> = ({ isOpen, onClose, 
       setError('Please fill title and content');
       return;
     }
+    if (!user || !session) {
+      setError('You must be logged in');
+      return;
+    }
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) throw new Error('You must be logged in');
-      if (!file) throw new Error('Please select an image');
-      const form = new FormData();
-      form.append('title', title);
-      form.append('content', content);
-      form.append('category', category);
-      form.append('image', file);
-      const res = await fetch('http://localhost:4000/api/prompts', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form
-      });
-      if (!res.ok) {
-        const msg = await res.json().catch(() => ({}));
-        throw new Error(msg?.message || 'Failed to create prompt');
+      let imageUrl: string | null = null;
+      
+      if (file) {
+        const { url, error: uploadError } = await uploadPromptImage(file, user.id, session.access_token);
+        if (uploadError) throw new Error(uploadError);
+        imageUrl = url;
       }
-      const data = await res.json();
+      
+      const { data, error: createError } = await createPrompt({
+        title,
+        content,
+        category,
+        image_url: imageUrl
+      }, user.id, user.email || '', session.access_token);
+      
+      if (createError) throw new Error(createError.message || 'Failed to create prompt');
+      
       onCreated(data);
       onClose();
       setTitle('');
